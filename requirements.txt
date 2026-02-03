@@ -1,0 +1,9 @@
+rumps
+pyaudio
+numpy
+Pillow
+bleak
+mlx-whisper
+pyperclip
+pyautogui
+pynput

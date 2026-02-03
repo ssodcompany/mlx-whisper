@@ -150,7 +150,6 @@ class VoiceRecorderApp(rumps.App):
         def on_press(key):
             current_keys.add(key)
             if target_keys.issubset(current_keys):
-                rumps.App._ns_application.activateIgnoringOtherApps_(False)
                 self.toggle_recording(None)
         
         def on_release(key):
