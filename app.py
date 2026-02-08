@@ -36,6 +36,7 @@ class VoiceRecorderApp(rumps.App):
         self.audio = pyaudio.PyAudio()
         self.stream = None
         self.record_thread = None
+        self.last_active_app = None  # 녹음 시작 전 활성 앱 저장용
 
         # UI 작업 큐(메인 루프에서만 UI 변경/notification 실행)
         self._uiq: "queue.Queue[callable]" = queue.Queue()
@@ -357,6 +358,17 @@ class VoiceRecorderApp(rumps.App):
         if self.is_recording:
             return
 
+        # 현재 활성 앱 저장 (붙여넣기 시 복원용)
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to get name of first application process whose frontmost is true'],
+                capture_output=True, text=True, timeout=2
+            )
+            self.last_active_app = result.stdout.strip()
+        except:
+            self.last_active_app = None
+
         self.is_recording = True
         self.frames = []
 
@@ -452,22 +464,19 @@ class VoiceRecorderApp(rumps.App):
             text = (result.get("text") or "").strip()
 
             if text:
-                pyperclip.copy(text)
-
-                # 붙여넣기 (메인루프에서 실행하는 게 더 안전)
-                def do_paste():
-                    try:
-                        pyautogui.hotkey("command", "v")
-                    except Exception as e:
-                        self._notify("붙여넣기 오류", "", str(e)[:120])
-
-                # 약간 딜레이 후 메인루프에서 수행
-                time.sleep(0.1)
-                self._ui(do_paste)
-
-                self._notify("음성 인식 완료", "", text[:50] + ("..." if len(text) > 50 else ""))
+                # pynput으로 직접 텍스트 입력 (받아쓰기처럼)
+                try:
+                    from pynput.keyboard import Controller
+                    kb = Controller()
+                    time.sleep(0.1)
+                    kb.type(text)
+                    print(f"✅ 텍스트 입력됨: {text[:50]}...")
+                except Exception as e:
+                    # 실패시 클립보드 복사 후 붙여넣기 시도
+                    pyperclip.copy(text)
+                    print(f"❌ 직접 입력 실패, 클립보드 복사: {e}")
             else:
-                self._notify("음성 인식", "", "인식된 텍스트가 없습니다.")
+                print("음성 인식: 인식된 텍스트 없음")
 
         except Exception as e:
             self._notify("오류", "", str(e)[:160])
